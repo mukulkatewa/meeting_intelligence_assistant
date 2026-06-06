@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Intelligence Assistant</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Meeting Intelligence Assistant</h1>
+      <p>Upload deck, audio, and screen recording, then ask cross-modal questions.</p>
+    </header>
+
+    <section class="card">
+      <h2>1. Provide meeting inputs</h2>
+      <form id="upload-form">
+        <label>
+          Presentation deck (PDF)
+          <input type="file" name="deck" accept="application/pdf" required>
+        </label>
+        <label>
+          Meeting audio (WAV/MP3)
+          <input type="file" name="audio" accept="audio/*" required>
+        </label>
+        <label>
+          Screen recording (MP4)
+          <input type="file" name="video" accept="video/*" required>
+        </label>
+        <div class="actions">
+          <button type="submit">Upload and index meeting</button>
+          <button type="button" id="demo-btn" class="secondary">Load demo meeting</button>
+        </div>
+      </form>
+      <p id="status-text" class="status">No meeting loaded.</p>
+    </section>
+
+    <section class="card">
+      <h2>2. Ask a question</h2>
+      <form id="ask-form">
+        <label>
+          Question
+          <textarea id="question" rows="3" placeholder="What was the final decision on the pricing change?" required></textarea>
+        </label>
+        <button type="submit" id="ask-btn" disabled>Ask assistant</button>
+      </form>
+
+      <div class="examples">
+        <p>Example questions:</p>
+        <button type="button" class="example-q">What was the final decision on the pricing change?</button>
+        <button type="button" class="example-q">Which slide was being discussed when the budget came up?</button>
+        <button type="button" class="example-q">Who disagreed with the timeline and what did they propose instead?</button>
+      </div>
+    </section>
+
+    <section class="card" id="answer-section" hidden>
+      <h2>Answer</h2>
+      <p id="answer-text"></p>
+      <h3>Evidence</h3>
+      <ul id="evidence-list"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

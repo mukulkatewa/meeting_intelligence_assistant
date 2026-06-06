@@ -1,0 +1,8 @@
+node_modules/
+.venv/
+.env
+data/
+uploads/
+sample_inputs/generated/
+*.log
+.DS_Store
