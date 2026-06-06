@@ -121,10 +121,24 @@ askForm.addEventListener('submit', async (event) => {
       return;
     }
 
-    answerText.textContent = payload.answer || 'No answer returned.';
+    let answer = payload.answer || 'No answer returned.';
+    let evidence = payload.evidence || [];
+
+    if (typeof answer === 'string' && answer.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(answer.trim());
+        answer = parsed.answer || answer;
+        if (Array.isArray(parsed.evidence) && parsed.evidence.length > 0) {
+          evidence = parsed.evidence;
+        }
+      } catch (_error) {
+        // keep server values
+      }
+    }
+
+    answerText.textContent = answer;
     evidenceList.innerHTML = '';
 
-    const evidence = payload.evidence || [];
     if (evidence.length === 0) {
       const item = document.createElement('li');
       item.textContent = 'No structured evidence returned.';

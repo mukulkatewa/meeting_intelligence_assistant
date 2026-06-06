@@ -8,6 +8,7 @@ const { processMeeting, getStatus } = require('../services/processMeeting');
 const { loadIndex } = require('../services/buildIndex');
 const { retrieveContext, buildContextBlock } = require('../services/retrieve');
 const { askModel } = require('../services/askModel');
+const { refineAnswer } = require('../services/groundAnswer');
 
 const router = express.Router();
 
@@ -149,11 +150,12 @@ router.post('/:meetingId/ask', async (req, res) => {
     const retrieval = retrieveContext(index, question.trim());
     const contextBlock = buildContextBlock(index, retrieval);
     const modelAnswer = await askModel(question.trim(), contextBlock);
+    const finalAnswer = refineAnswer(question.trim(), index, modelAnswer, retrieval);
 
     res.json({
       question: question.trim(),
-      answer: modelAnswer.answer,
-      evidence: modelAnswer.evidence,
+      answer: finalAnswer.answer,
+      evidence: finalAnswer.evidence,
       retrievedChunks: retrieval.chunks,
       fallbackRetrieval: retrieval.fallback,
     });

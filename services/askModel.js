@@ -1,18 +1,19 @@
 const config = require('../config');
+const { parseModelJson } = require('./parseModelJson');
 
 async function askModel(question, contextBlock) {
   const systemPrompt = [
     'You are a meeting intelligence assistant.',
-    'Answer using evidence from slides, transcript, and video notes.',
-    'For cross-modal questions, combine at least two modalities when possible.',
-    'Return valid JSON only with this shape:',
-    '{"answer":"...", "evidence":[{"type":"slide|audio|video|timeline","ref":"...","quote":"...","speaker":"optional","slideNumber":optional}]}',
-    'Do not invent facts not supported by the context.',
+    'Use exact speaker names from the transcript lines.',
+    'Combine slide, audio, and video evidence for cross-modal questions.',
+    'Return valid JSON only:',
+    '{"answer":"plain text answer","evidence":[{"type":"slide|audio|video","ref":"...","quote":"...","speaker":"optional","slideNumber":optional}]}',
+    'Do not wrap JSON in markdown.',
+    'Do not invent facts not in the context.',
   ].join(' ');
 
   const userPrompt = [
-    'Use the meeting context below to answer the question.',
-    'Include grounded evidence with slide numbers, timestamps, or speaker names.',
+    'Use the meeting context below.',
     '',
     contextBlock,
     '',
@@ -32,7 +33,7 @@ async function askModel(question, contextBlock) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 2048,
         chat_template_kwargs: { enable_thinking: false },
       }),
@@ -60,33 +61,6 @@ async function askModel(question, contextBlock) {
   content = content.replace(/[\s\S]*?<\/think>/gi, '').trim();
 
   return parseModelJson(content);
-}
-
-function parseModelJson(content) {
-  const trimmed = content.trim();
-  const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    return {
-      answer: trimmed,
-      evidence: [],
-      raw: content,
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      answer: parsed.answer || trimmed,
-      evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
-      raw: content,
-    };
-  } catch (_error) {
-    return {
-      answer: trimmed,
-      evidence: [],
-      raw: content,
-    };
-  }
 }
 
 module.exports = { askModel };
