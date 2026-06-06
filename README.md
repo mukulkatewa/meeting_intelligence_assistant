@@ -97,7 +97,7 @@ sample_inputs/generated/  # Generated demo deck/audio/video
 ## Requirements
 
 - Node.js 18+
-- Python 3 + `faster-whisper`
+- Python 3 venv with `faster-whisper`, `pypdf`, `gTTS`, `pydub`
 - ffmpeg, ffprobe
 - Optional: `tesseract` for slide label OCR
 - Docker + NVIDIA GPU runtime for Nemotron vLLM server

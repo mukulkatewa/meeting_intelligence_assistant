@@ -1,35 +1,32 @@
 const fs = require('fs');
 const path = require('path');
-const pdfParse = require('pdf-parse');
+const { spawnSync } = require('child_process');
+const config = require('../config');
 
-function splitIntoSlides(text) {
-  const chunks = text
-    .split(/\f|\n(?=Slide\s+\d+)/i)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean);
-
-  if (chunks.length <= 1) {
-    const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
-    const slideSize = 8;
-    const slides = [];
-    for (let i = 0; i < lines.length; i += slideSize) {
-      slides.push(lines.slice(i, i + slideSize).join('\n'));
-    }
-    return slides.length ? slides : [text.trim()];
+function getPythonCommand() {
+  const venvPython = path.join(process.cwd(), '.venv', 'bin', 'python3');
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
   }
-
-  return chunks;
+  return 'python3';
 }
 
-async function ingestPdf(filePath) {
-  const buffer = fs.readFileSync(filePath);
-  const parsed = await pdfParse(buffer);
-  const slideTexts = splitIntoSlides(parsed.text || '');
+function ingestPdf(filePath) {
+  const scriptPath = path.resolve(__dirname, '../scripts/extract_pdf.py');
+  const result = spawnSync(getPythonCommand(), [scriptPath, filePath], {
+    encoding: 'utf8',
+  });
 
-  return slideTexts.map((text, index) => ({
-    slideNumber: index + 1,
-    text,
-  }));
+  if (result.error) {
+    throw new Error(`Failed to extract PDF text: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || 'PDF extraction failed');
+  }
+
+  const payload = JSON.parse(result.stdout);
+  return payload.slides;
 }
 
 module.exports = { ingestPdf };

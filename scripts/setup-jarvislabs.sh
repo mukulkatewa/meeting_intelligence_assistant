@@ -16,7 +16,7 @@ npm install
 echo "Installing Python virtual environment..."
 python3 -m venv .venv
 .venv/bin/pip install --upgrade pip
-.venv/bin/pip install faster-whisper gTTS pydub
+.venv/bin/pip install faster-whisper gTTS pydub pypdf
 
 echo "Checking system tools..."
 command -v ffmpeg >/dev/null
