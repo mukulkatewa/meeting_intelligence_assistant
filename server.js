@@ -18,6 +18,6 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(config.port, () => {
-  console.log(`Meeting assistant running on http://localhost:${config.port}`);
+app.listen(config.port, '0.0.0.0', () => {
+  console.log(`Meeting assistant running on http://0.0.0.0:${config.port}`);
 });

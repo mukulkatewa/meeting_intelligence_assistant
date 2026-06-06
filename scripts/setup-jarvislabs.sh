@@ -7,8 +7,24 @@ cd "$ROOT_DIR"
 echo "Installing system packages..."
 if command -v apt-get >/dev/null; then
   sudo apt-get update -qq
-  sudo apt-get install -y espeak-ng imagemagick ffmpeg tesseract-ocr
+  sudo apt-get install -y espeak-ng imagemagick ffmpeg tesseract-ocr git curl ca-certificates
 fi
+
+if ! command -v npm >/dev/null || [ "$(node -v | sed 's/v//' | cut -d. -f1)" -lt 18 ]; then
+  echo "Node.js 18+ required. Installing Node.js 20..."
+  sudo apt-get remove -y nodejs npm 2>/dev/null || true
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+fi
+
+if ! command -v python3 >/dev/null; then
+  sudo apt-get install -y python3 python3-venv python3-pip
+elif ! python3 -m venv --help >/dev/null 2>&1; then
+  sudo apt-get install -y python3-venv python3-pip
+fi
+
+echo "Node version: $(node -v)"
+echo "npm version: $(npm -v)"
 
 echo "Installing Node dependencies..."
 npm install

@@ -4,5 +4,6 @@ node_modules/
 data/
 uploads/
 sample_inputs/generated/
+learn.md
 *.log
 .DS_Store

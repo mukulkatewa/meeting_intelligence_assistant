@@ -1,21 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start Nemotron 3 Omni via vLLM on JarvisLabs GPU instance.
-# Requires Docker and NVIDIA drivers.
-
 MODEL="${MODEL_NAME:-nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4}"
 PORT="${MODEL_PORT:-8000}"
+CONTAINER_NAME="${CONTAINER_NAME:-nemotron-omni}"
 
-docker run --rm -d \
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker is not running."
+  exit 1
+fi
+
+docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+
+echo "Starting Nemotron (first run can take 15-30 minutes)..."
+docker run -d \
   --gpus all \
   --ipc=host \
   --shm-size=16g \
   -p "${PORT}:8000" \
   -v /:/host \
-  --name nemotron-omni \
+  --name "${CONTAINER_NAME}" \
+  --entrypoint /bin/bash \
   vllm/vllm-openai:v0.20.0 \
-  bash -lc "pip install 'vllm[audio]==0.20.0' && vllm serve ${MODEL} \
+  -lc "pip install 'vllm[audio]==0.20.0' && vllm serve ${MODEL} \
     --host 0.0.0.0 \
     --port 8000 \
     --served-model-name nemotron \
@@ -30,4 +37,13 @@ docker run --rm -d \
     --tool-call-parser qwen3_coder \
     --kv-cache-dtype fp8"
 
-echo "Nemotron vLLM server starting on port ${PORT}"
+sleep 3
+
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+  echo "Container running. Watch logs:"
+  echo "  docker logs -f ${CONTAINER_NAME}"
+else
+  echo "Container exited. Logs:"
+  docker logs "${CONTAINER_NAME}" || true
+  exit 1
+fi

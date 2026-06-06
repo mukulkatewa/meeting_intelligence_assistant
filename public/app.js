@@ -95,6 +95,7 @@ demoBtn.addEventListener('click', async () => {
 askForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!meetingId) {
+    setStatus('Load a meeting first (demo or upload).', 'error');
     return;
   }
 
@@ -106,45 +107,50 @@ askForm.addEventListener('submit', async (event) => {
   askBtn.disabled = true;
   setStatus('Generating grounded answer...', 'processing');
 
-  const response = await fetch(`/api/meetings/${meetingId}/ask`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question }),
-  });
+  try {
+    const response = await fetch(`/api/meetings/${meetingId}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
 
-  const payload = await response.json();
-  askBtn.disabled = false;
-  setStatus(`Meeting ${meetingId} is ready.`, 'ready');
+    const payload = await response.json();
 
-  if (!response.ok) {
-    setStatus(payload.error || 'Question failed', 'error');
-    return;
-  }
-
-  answerText.textContent = payload.answer || 'No answer returned.';
-  evidenceList.innerHTML = '';
-
-  const evidence = payload.evidence || [];
-  if (evidence.length === 0) {
-    const item = document.createElement('li');
-    item.textContent = 'No structured evidence returned.';
-    evidenceList.appendChild(item);
-  } else {
-    for (const entry of evidence) {
-      const item = document.createElement('li');
-      const parts = [
-        `[${entry.type || 'source'}]`,
-        entry.ref ? `ref: ${entry.ref}` : null,
-        entry.speaker ? `speaker: ${entry.speaker}` : null,
-        entry.slideNumber ? `slide: ${entry.slideNumber}` : null,
-        entry.quote ? `"${entry.quote}"` : null,
-      ].filter(Boolean);
-      item.textContent = parts.join(' | ');
-      evidenceList.appendChild(item);
+    if (!response.ok) {
+      setStatus(payload.error || 'Question failed', 'error');
+      return;
     }
-  }
 
-  answerSection.hidden = false;
+    answerText.textContent = payload.answer || 'No answer returned.';
+    evidenceList.innerHTML = '';
+
+    const evidence = payload.evidence || [];
+    if (evidence.length === 0) {
+      const item = document.createElement('li');
+      item.textContent = 'No structured evidence returned.';
+      evidenceList.appendChild(item);
+    } else {
+      for (const entry of evidence) {
+        const item = document.createElement('li');
+        const parts = [
+          `[${entry.type || 'source'}]`,
+          entry.ref ? `ref: ${entry.ref}` : null,
+          entry.speaker ? `speaker: ${entry.speaker}` : null,
+          entry.slideNumber ? `slide: ${entry.slideNumber}` : null,
+          entry.quote ? `"${entry.quote}"` : null,
+        ].filter(Boolean);
+        item.textContent = parts.join(' | ');
+        evidenceList.appendChild(item);
+      }
+    }
+
+    answerSection.hidden = false;
+    setStatus('Answer ready.', 'ready');
+  } catch (error) {
+    setStatus(error.message || 'Request failed. Is the app still running?', 'error');
+  } finally {
+    askBtn.disabled = false;
+  }
 });
 
 for (const button of document.querySelectorAll('.example-q')) {

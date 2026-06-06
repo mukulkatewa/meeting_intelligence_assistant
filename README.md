@@ -1,80 +1,213 @@
 # Meeting Intelligence Assistant
 
-Multimodal meeting Q&A assistant built with Node.js, Express, and NVIDIA Nemotron 3 Omni.
+Multimodal meeting Q&A assistant built with Node.js, Express, and NVIDIA Nemotron 3 Omni on JarvisLabs.
+
+**GitHub:** https://github.com/mukulkatewa/meeting_intelligence_assistant
+
+**Live demo (JarvisLabs):** `http://217.18.55.20:3000` (instance must be running)
+
+---
 
 ## What it does
 
-This app ingests a meeting deck (PDF), meeting audio, and a screen recording together, then answers natural-language questions across all three sources. Responses include grounded evidence such as slide numbers, timestamps, speaker references, and short quotes so answers can be verified.
+This app takes three meeting inputs together — a PDF deck, meeting audio, and a screen recording — and lets you ask questions across all of them as one meeting. Answers include grounded evidence (slide numbers, timestamps, speaker labels, and quotes) so you can verify each response.
+
+---
 
 ## Why I built this
 
-Meetings rarely live in one format: decisions appear in slides, debate happens in audio, and context is visible in screen recordings. I picked this problem because cross-modal retrieval is a practical real-world need, and it maps well to an open omni model like Nemotron 3 Omni. The goal was to keep the pipeline simple and inspectable while still demonstrating true multimodal reasoning.
+Meetings are never stored in just one format. Decisions live on slides, arguments happen in audio, and context appears in screen recordings. I picked this problem because it is a real workflow pain point and it maps naturally to an open omni model like Nemotron 3 Omni. I wanted a pipeline that is simple to inspect, easy for reviewers to run, and still demonstrates true cross-modal reasoning instead of single-file Q&A.
+
+---
 
 ## How to run it
 
+### Prerequisites
+
+- JarvisLabs GPU instance (1x H100 or A100 recommended)
+- Docker with NVIDIA GPU support
+- Node.js 18+
+- Python 3 with venv
+- ffmpeg, tesseract (optional but recommended)
+
 ### 1) JarvisLabs setup
 
-1. Redeem coupon code: `JARVIS_LABS_7TAR8N`
-2. Launch a GPU instance (recommended: 1x A100/H100 with enough VRAM for Nemotron 3 Nano Omni)
-3. Clone this repo on the instance
-4. Run setup:
+1. Create account at [jarvislabs.ai](https://jarvislabs.ai)
+2. Redeem coupon: `JARVIS_LABS_7TAR8N`
+3. Add SSH key in Settings
+4. Launch VM with H100/A100 and Docker template
+5. SSH into the instance:
 
 ```bash
+ssh ubuntu@<your-jarvislabs-ip>
+```
+
+6. Clone and setup:
+
+```bash
+git clone https://github.com/mukulkatewa/meeting_intelligence_assistant.git
+cd meeting_intelligence_assistant
 chmod +x scripts/*.sh
 ./scripts/setup-jarvislabs.sh
 ```
 
-### 2) Start Nemotron 3 Omni (vLLM)
+### 2) Start Nemotron 3 Omni (Terminal 1)
 
 ```bash
 ./scripts/start-model.sh
+docker logs -f nemotron-omni
 ```
 
-This starts an OpenAI-compatible vLLM server on port `8000`.
+Wait until you see `Application startup complete` (first run: 15–30 minutes).
 
-### 3) Start the web app
+Test:
+
+```bash
+curl http://127.0.0.1:8000/v1/models
+```
+
+### 3) Start web app (Terminal 2)
+
+```bash
+./scripts/start-app.sh
+```
+
+Or:
 
 ```bash
 cp .env.example .env
 npm start
 ```
 
-Open `http://<jarvislabs-public-ip>:3000`.
+Open: `http://<jarvislabs-ip>:3000`
 
-### 4) Try the demo meeting
+### 4) Try the demo
 
-In the UI, click **Load demo meeting** (or run `npm run generate-sample` first if files are missing).
+Click **Load demo meeting**, wait for status **ready**, then ask the example questions below.
 
-Then ask:
+To regenerate demo files:
 
-1. `What was the final decision on the pricing change?`
-2. `Which slide was being discussed when the budget came up?`
-3. `Who disagreed with the timeline and what did they propose instead?`
+```bash
+npm run generate-sample
+```
 
-These require combining slide content, transcript timing, and video/slide alignment.
+---
+
+## Cross-modal example questions (required)
+
+These questions need **more than one input type** to answer correctly.
+
+### Q1: What was the final decision on the pricing change?
+
+**Expected answer:** Pricing moved from $49/month to **$59/month**.
+
+**Grounding:**
+- Slide 6: "Pricing change approved: $59/month"
+- Audio (~00:42): "Final decision: move pricing to fifty nine dollars..."
+
+**Modalities used:** deck + audio
+
+---
+
+### Q2: Which slide was being discussed when the budget came up?
+
+**Expected answer:** **Slide 4** (Budget Discussion, $120,000 launch budget).
+
+**Grounding:**
+- Audio (~00:18): "When budget came up on slide four..."
+- Slide 4 text: "Launch budget request: $120,000"
+- Video frames show "Slide 4" label during that segment
+
+**Modalities used:** audio + deck + video
+
+---
+
+### Q3: Who disagreed with the timeline and what did they propose instead?
+
+**Expected answer:** A participant disagreed with the **8-week** timeline and proposed **10 weeks** instead. Final decision also adopted 10 weeks.
+
+**Grounding:**
+- Slide 5: "Initial proposal: 8 weeks"
+- Audio (~00:30): "I disagree with the eight week timeline on slide five. I propose ten weeks instead."
+- Slide 6: "Timeline updated to 10 weeks"
+
+**Modalities used:** audio + deck (+ video for slide visibility)
+
+---
+
+## Input types supported
+
+| Input | Format | Processing |
+|-------|--------|------------|
+| Deck | PDF | Text extracted per slide via `pypdf` |
+| Audio | WAV/MP3 | Transcript + timestamps via `faster-whisper` |
+| Video | MP4 | Frame sampling via `ffmpeg`, slide OCR via `tesseract` |
+
+All three are uploaded together and merged into one JSON meeting index.
+
+---
 
 ## Architecture decisions
 
-- **Express + plain HTML frontend**: Chosen for fast setup and easy reviewer testing. A React frontend would add build complexity without improving core assignment goals.
-- **Pre-index meeting inputs before Q&A**: Raw 30-60 minute media is expensive to send on every question. I preprocess once into a JSON meeting index and retrieve relevant chunks per question.
-- **Whisper (`faster-whisper`) for audio grounding**: Nemotron can consume audio directly, but Whisper gives reliable timestamped transcript segments for citation and timeline alignment.
-- **ffmpeg frame extraction + optional OCR for video grounding**: Video is sampled every N seconds; OCR reads visible "Slide X" labels to link spoken moments to deck pages.
-- **Keyword retrieval instead of vector DB**: For this scope, lightweight retrieval over indexed chunks is enough and keeps dependencies minimal.
-- **Nemotron 3 Omni via vLLM OpenAI API**: Matches assignment model requirement and keeps inference isolated behind a stable HTTP interface.
+| Decision | What I chose | Why (vs obvious alternative) |
+|----------|--------------|-------------------------------|
+| Backend | Express + plain HTML | Faster to ship and test than React; reviewers can run with `npm start` only |
+| Model | Nemotron 3 Omni via vLLM | Assignment requirement; OpenAI-compatible API keeps app code simple |
+| Hosting | Same JarvisLabs VM for model + app | Assignment requirement; model on `:8000`, app on `:3000` |
+| Pre-indexing | JSON meeting index before Q&A | Sending full video/audio every question is slow and expensive |
+| Audio parsing | Whisper for timestamps | Nemotron can read audio, but Whisper gives reliable citation timestamps |
+| Video parsing | ffmpeg frames + OCR | Cheaper than sending full video to the model on every question |
+| Retrieval | Keyword scoring | Good enough for demo scope; vector DB adds infra without big gain here |
+| Sample data | Generated aligned demo | Reviewers can test without recording a real meeting |
+
+---
+
+## What worked
+
+- End-to-end flow: upload/demo → index → ask → grounded answer
+- Nemotron 3 Omni on JarvisLabs H100 via vLLM Docker
+- Cross-modal answers with slide numbers and audio quotes
+- Demo meeting generator creates aligned PDF + audio + video
+- Simple web UI reviewers can use immediately
+
+## What did not work smoothly
+
+- Default Ubuntu Node (v12) on JarvisLabs had no npm — fixed by installing Node 20 via NodeSource
+- vLLM Docker image entrypoint required `--entrypoint /bin/bash` (without it, `bash -lc` was passed to vllm and failed)
+- First model load takes 15–30 minutes; easy to think the system is broken
+- Whisper speaker labels are placeholders (Speaker 1/2/3), not real diarization
+- Audio timestamps from Whisper do not always match scripted demo timestamps exactly
+- App must stay running (`npm start`); stopping it leaves browser stuck on "Generating answer..."
+
+---
 
 ## What I used AI for
 
-- AI helped scaffold initial Express route/service structure and README wording.
-- I wrote ingestion logic, retrieval format, grounded JSON response contract, and sample-meeting generation script by hand.
-- I overrode AI suggestions to remove unnecessary abstractions (no microservices, no vector DB, no React) to keep the project simple and assignment-focused.
+| Part | AI / Hand-written |
+|------|-------------------|
+| Express project scaffold | AI-assisted |
+| Ingestion pipeline (PDF, audio, video) | Hand-written |
+| Meeting index + retrieval logic | Hand-written |
+| Nemotron prompt + JSON answer format | Hand-written |
+| Sample meeting generator | Hand-written |
+| JarvisLabs setup scripts | Hand-written after debugging on VM |
+| README structure | AI-assisted, edited manually |
+
+**Where I overrode AI:** Removed React, vector DB, and microservices suggestions to keep the project simple and debuggable on one GPU VM.
+
+---
 
 ## What I would change with 4 more weeks
 
-- Add true speaker diarization (pyannote) instead of placeholder speaker labels.
-- Improve slide-video alignment using scene-change detection and stronger OCR/layout parsing.
-- Add semantic retrieval (embeddings) for better recall on paraphrased questions.
-- Add meeting upload progress, retryable background jobs, and persistent storage.
-- Add evaluation harness with labeled Q&A pairs and citation accuracy scoring before shipping to real users.
+- Real speaker diarization (pyannote) instead of Whisper placeholder speakers
+- Semantic retrieval with embeddings for paraphrased questions
+- Better slide-video sync using scene detection
+- Background job queue for long ingestion tasks
+- Automated evaluation set with citation accuracy scoring
+- Auth, multi-user storage, and production deployment (PM2, nginx, HTTPS)
+- Fix edge cases in model JSON parsing for Nemotron reasoning output
+
+---
 
 ## Project layout
 
@@ -83,37 +216,42 @@ server.js                 # Express entrypoint
 routes/meetings.js        # Upload, demo, status, ask APIs
 services/                 # Ingestion, indexing, retrieval, model call
 scripts/                  # JarvisLabs setup, vLLM launch, sample generation
-public/                   # Minimal web UI
-sample_inputs/generated/  # Generated demo deck/audio/video
+public/                   # Web UI
+sample_inputs/generated/  # Demo deck/audio/video (generated locally)
 ```
+
+---
 
 ## API endpoints
 
-- `POST /api/meetings` - upload deck/audio/video
-- `POST /api/meetings/demo` - index bundled demo meeting
-- `GET /api/meetings/:id/status` - processing status
-- `POST /api/meetings/:id/ask` - ask grounded question
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/meetings` | Upload deck + audio + video |
+| POST | `/api/meetings/demo` | Index bundled demo meeting |
+| GET | `/api/meetings/:id/status` | Processing status |
+| GET | `/api/meetings/:id/index` | Full meeting index (debug) |
+| POST | `/api/meetings/:id/ask` | Ask grounded question |
+| GET | `/api/health` | Health check |
 
-## Requirements
+---
 
-- Node.js 18+
-- Python 3 venv with `faster-whisper`, `pypdf`, `gTTS`, `pydub`
-- ffmpeg, ffprobe
-- Optional: `tesseract` for slide label OCR
-- Docker + NVIDIA GPU runtime for Nemotron vLLM server
+## Assignment checklist
 
-## Sample input generation
+- [x] Three input types: PDF deck, audio, video
+- [x] Cross-modal Q&A with grounded citations
+- [x] Three example cross-modal questions in README
+- [x] Runnable web app with sample demo inputs
+- [x] Nemotron 3 Omni on JarvisLabs (vLLM inference)
+- [x] App deployed on same JarvisLabs instance
+- [x] README follows required template
+- [x] Project on GitHub
 
-If demo files are missing:
+---
 
-```bash
-npm run generate-sample
-```
+## Tech stack
 
-This creates:
-
-- `sample_inputs/generated/deck.pdf`
-- `sample_inputs/generated/meeting_audio.wav`
-- `sample_inputs/generated/screen_recording.mp4`
-
-Dependencies for generation: `ffmpeg` plus either `espeak-ng` or Python packages `gTTS` and `pydub`.
+- **Backend:** Node.js, Express, Multer
+- **Frontend:** HTML, CSS, vanilla JS
+- **Ingestion:** pypdf, faster-whisper, ffmpeg, tesseract
+- **Model:** NVIDIA Nemotron 3 Nano Omni (NVFP4) via vLLM 0.20.0
+- **Deploy:** JarvisLabs H100 GPU instance
